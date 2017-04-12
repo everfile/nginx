@@ -1,0 +1,6 @@
+pages:                        # the build job must be named pages
+  script:
+  - echo 'Nothing to do...'
+  artifacts:
+    paths:
+    - public                  # this is where the site will live and the Runner uploads it in GitLab
