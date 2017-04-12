@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# 判断是否是Mac
+is_mac(){
+	uname=`uname`
+	if [ "X${uname}" == "XDarwin" ]; then
+		return 0 # is mac
+	else
+		return 1 # not is mac
+	fi
+}
+
+# Installation PREFIX
+PREFIX="/usr/local"
+
+# 检测是否私有具有 root 权限
+if [ $UID -ne 0 ]; then
+	echo "You do not have permission, Please run the command as root!"
+	exit 0
+fi
+
+# 是否运行
+is_running(){
+	if is_mac ; then
+		# 1234 nginx: master process ./sbin/nginx
+		pid=`ps -u root -o pid,args | awk '/.\/sbin\/nginx/ {print $1}'`
+	else
+		# 1234 nginx: master process ./sbin/nginx
+		pid=`ps -u root -o pid,args | awk '/.\/sbin\/nginx/ {print $1}'`
+	fi
+
+	if [ "X${pid}" != "X" ]; then
+		return 0 # running
+	else
+		return 1 # not running
+	fi
+}
+
+# 状态
+status(){
+	if is_running ; then
+		echo "Nginx is running ..."
+		echo "pid:$pid"
+		echo ""
+		echo "child processes:"
+		echo -n "	total:"
+		lsof -u www-data -P | grep "*:80 (LISTEN)" | wc -l
+		lsof -u www-data -P | grep "*:80 (LISTEN)"
+	else
+		echo "Nginx is not running ..."
+	fi
+}
+
+# 启动
+start(){
+	if is_running ; then
+		echo "Nginx is already running..."
+		exit 0
+	fi
+	echo -n "Starting Nginx:"
+	(cd "$PREFIX" && ./sbin/nginx >/tmp/nginx-start.log)
+	echo "ok"
+}
+
+# 停止
+stop(){
+	if ! is_running; then
+		echo "Nginx is not running"
+	else
+		echo -n "Stopping Nginx:"
+		(cd "$PREFIX" && ./sbin/nginx -s stop >/tmp/nginx-stop.log)
+		echo "ok"
+	fi
+}
+
+
+case $1 in
+	# 英文启动
+	start)
+		start
+	;;
+	# 英文停止
+	stop)
+		stop
+	;;
+	# 英文状态
+	status)
+		status
+	;;
+	# 英文重启
+	restart)
+		stop
+		sleep 1
+		start
+	;;
+
+	# 拼音首字母启动
+	q)
+		start
+	;;
+	# 拼音首字母停止
+	t)
+		stop
+	;;
+	# 拼音首字母状态
+	z)
+		status
+	;;
+	# 拼音首字母重启
+	c)
+		stop
+		sleep 1
+		start
+	;;
+
+	*)
+	# Print help
+		echo "Usage:$0 {start|stop|status|restart}" 1>&2
+		exit 0
+	;;
+esac
