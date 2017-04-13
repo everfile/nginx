@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# 检测是否私有具有 root 权限
+if [ $UID -ne 0 ]; then
+	echo "You do not have permission, Please run the command as root!"
+	exit 0
+fi
+
+DATE=`date +"%y%m%d"`
+
+AWSTATS_DIR=/var/www/wwwroot/awstats
+PUBLIC_DIR=$AWSTATS_DIR/public
+DATE_DIR=$AWSTATS_DIR/public/$DATE
+LOG_DIR=$DATE_DIR/log
+HTML_DIR=$DATE_DIR/html
+
+mkdir -p $LOG_DIR
+mkdir -p $HTML_DIR
+
+[ ! -d $PUBLIC_DIR/icon ] && cp -r /usr/local/awstats/wwwroot/icon $PUBLIC_DIR/
+
+
+NGINX_LOG_BYDATE="$LOG_DIR/nginx_access_$DATE.log"
+NGINX_PID=`ps -u root -o pid,args | awk '/.\/sbin\/nginx/ {print $1}'`
+
+if [ -f "/var/www/log/nginx_access.log" ]; then
+	# 生成html
+	/usr/local/awstats/tools/awstats_buildstaticpages.pl -update -config=default -lang=cn -dir=$HTML_DIR -awstatsprog=/usr/local/awstats/wwwroot/cgi-bin/awstats.pl
+
+	if [ -f $NGINX_LOG_BYDATE ]; then
+		cat /var/www/log/nginx_access.log >> $NGINX_LOG_BYDATE
+		rm /var/www/log/nginx_access.log
+	else
+		mv /var/www/log/nginx_access.log $NGINX_LOG_BYDATE
+	fi
+else
+	exit 0
+fi 
+
+# 给nginx发送USR1信号，使重新打开新的 nginx_access.log 日志文件
+[ "X${pid}" = "X" ] && /bin/kill -USR1 $NGINX_PID
+
+# 索引
+wget -O $PUBLIC_DIR/index.html https://raw.githubusercontent.com/everfile/nginx-awstats-year-calendar/gh-pages/index.html
+
+# git 到 https://gitlab.com/awstats/
+cd $AWSTATS_DIR
+
+if [ ! -d ".git" ]; then
+	su - www-data -c "cd $AWSTATS_DIR && git init"
+	git remote add origin git@gitlab.com:awstats/`hostname -s`.git
+	wget -O .gitlab-ci.yml https://raw.githubusercontent.com/everfile/nginx/gh-pages/awstats/.gitlab-ci.yml
+fi
+
+su - www-data -c "cd $AWSTATS_DIR && git add ."
+su - www-data -c "cd $AWSTATS_DIR && git commit -m $DATE"
+su - www-data -c "cd $AWSTATS_DIR && git push -u origin master"
+
+chown -R www-data:www-data $AWSTATS_DIR
